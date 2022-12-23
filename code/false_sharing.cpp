@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <assert>
+#include <cassert>
 #include <cmath>
 #include <iostream>
 #include <random>
@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 
+namespace {
 auto f(std::span<double> s)
 {
   for (int i{0}; i != 100'000'000; ++i) {
@@ -20,12 +21,13 @@ auto generate(int n)
 {
   std::vector<double> v;
   std::default_random_engine eng;
-  std::uniform_real_distribution<> dist{0., 1.};
+  std::uniform_real_distribution dist{0., 1.};
   v.reserve(n);
   std::generate_n(std::back_inserter(v), n, [&] { return dist(eng); });
 
   return v;
 }
+}  // namespace
 
 int main()
 {
@@ -39,18 +41,16 @@ int main()
   assert(it3 <= v.end());
   auto it4 = v.end();
 
-  std::vector<std::thread> vth;
-  vth.reserve(4);
-
   auto t0 = std::chrono::system_clock::now();
 
-  vth.emplace_back(std::thread{[s = std::span<double>{it0, it1}] { f(s); }});
-  vth.emplace_back(std::thread{[s = std::span<double>{it1, it2}] { f(s); }});
-  vth.emplace_back(std::thread{[s = std::span<double>{it2, it3}] { f(s); }});
-  vth.emplace_back(std::thread{[s = std::span<double>{it3, it4}] { f(s); }});
+  {
+    std::vector<std::jthread> vth;
+    vth.reserve(4);
 
-  for (auto&& th : vth) {
-    th.join();
+    vth.emplace_back([s = std::span<double>{it0, it1}] { f(s); });
+    vth.emplace_back([s = std::span<double>{it1, it2}] { f(s); });
+    vth.emplace_back([s = std::span<double>{it2, it3}] { f(s); });
+    vth.emplace_back([s = std::span<double>{it3, it4}] { f(s); });
   }
 
   auto t1 = std::chrono::system_clock::now();

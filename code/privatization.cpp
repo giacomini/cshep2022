@@ -5,8 +5,10 @@
 #include <span>
 #include <thread>
 #include <vector>
+#include "benchmark.hpp"
 
-auto count_5s(std::span<int> s, std::atomic<int>& count)
+namespace {
+auto count_5s(std::span<int const> s, std::atomic<int>& count)
 {
   for (auto&& e : s) {
     if (e == 5) {
@@ -24,6 +26,7 @@ auto generate(int n, int n_of_5s)
   std::shuffle(v.begin(), v.end(), eng);
   return v;
 }
+}  // namespace
 
 int main()
 {
@@ -34,20 +37,17 @@ int main()
 
   auto mid_it = std::next(v.begin(), v.size() / 2);
 
-  std::vector<std::thread> vth;
-  vth.reserve(2);
-
   std::atomic<int> count{0};
-  auto t0 = std::chrono::system_clock::now();
 
-  vth.emplace_back(std::thread{[&, s = std::span{v.begin(), mid_it}] { count_5s(s, count); }});
-  vth.emplace_back(std::thread{[&, s = std::span{mid_it, v.end()}] { count_5s(s, count); }});
+  auto bench = benchmark([&] {
+    std::vector<std::jthread> vth;
+    vth.reserve(2);
 
-  for (auto&& th : vth) {
-    th.join();
-  }
+    vth.emplace_back(
+        [&, s = std::span{v.begin(), mid_it}] { count_5s(s, count); });
+    vth.emplace_back(
+        [&, s = std::span{mid_it, v.end()}] { count_5s(s, count); });
+  });
 
-  auto t1 = std::chrono::system_clock::now();
-
-  std::cout << "#5 " << count << " in " << std::chrono::duration<double>{t1 - t0}.count() << " s\n";
+  std::cout << "#5 " << count << " in " << bench.count() << " s\n";
 }
